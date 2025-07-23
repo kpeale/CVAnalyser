@@ -1,3 +1,5 @@
+'use client';
+
 import { type FormEvent, useState } from 'react';
 import Navbar from '~/components/Navbar';
 import FileUploader from '~/components/FileUploader';
@@ -6,6 +8,16 @@ import { useNavigate } from 'react-router';
 import { convertPdfToImage } from '~/lib/pdf2img';
 import { generateUUID } from '~/lib/utils';
 import { prepareInstructions } from '../../constants';
+
+// Add mobile detection function
+const isMobileDevice = () => {
+  return (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) ||
+    (typeof window !== 'undefined' && window.innerWidth <= 768)
+  );
+};
 
 const Upload = () => {
   const { auth, isLoading, fs, ai, kv } = usePuterStore();
@@ -30,39 +42,52 @@ const Upload = () => {
     file: File;
   }) => {
     setIsProcessing(true);
-
     setStatusText('Uploading the file...');
+
     const uploadedFile = await fs.upload([file]);
     if (!uploadedFile) return setStatusText('Error: Failed to upload file');
 
-    setStatusText('Converting to image...');
-    const imageFile = await convertPdfToImage(file);
-    if (!imageFile.file)
-      return setStatusText('Error: Failed to convert PDF to image');
+    const isMobile = isMobileDevice();
+    let uploadedImage = null;
+    let imagePath = '';
 
-    setStatusText('Uploading the image...');
-    const uploadedImage = await fs.upload([imageFile.file]);
-    if (!uploadedImage) return setStatusText('Error: Failed to upload image');
+    if (!isMobile) {
+      // Desktop: Convert PDF to image
+      setStatusText('Converting to image...');
+      const imageFile = await convertPdfToImage(file);
+      if (!imageFile.file)
+        return setStatusText('Error: Failed to convert PDF to image');
+
+      setStatusText('Uploading the image...');
+      uploadedImage = await fs.upload([imageFile.file]);
+      if (!uploadedImage) return setStatusText('Error: Failed to upload image');
+      imagePath = uploadedImage.path;
+    } else {
+      // Mobile: Skip image conversion
+      setStatusText('Processing for mobile...');
+      imagePath = ''; // No image path for mobile
+    }
 
     setStatusText('Preparing data...');
     const uuid = generateUUID();
     const data = {
       id: uuid,
       resumePath: uploadedFile.path,
-      imagePath: uploadedImage.path,
+      imagePath: imagePath, // Will be empty string on mobile
       companyName,
       jobTitle,
       jobDescription,
       feedback: '',
     };
+
     await kv.set(`resume:${uuid}`, JSON.stringify(data));
 
     setStatusText('Analyzing...');
-
     const feedback = await ai.feedback(
       uploadedFile.path,
       prepareInstructions({ jobTitle, jobDescription })
     );
+
     if (!feedback) return setStatusText('Error: Failed to analyze resume');
 
     const feedbackText =
@@ -72,6 +97,7 @@ const Upload = () => {
 
     data.feedback = JSON.parse(feedbackText);
     await kv.set(`resume:${uuid}`, JSON.stringify(data));
+
     setStatusText('Analysis complete, redirecting...');
     console.log(data);
     navigate(`/resume/${uuid}`);
@@ -81,8 +107,8 @@ const Upload = () => {
     e.preventDefault();
     const form = e.currentTarget.closest('form');
     if (!form) return;
-    const formData = new FormData(form);
 
+    const formData = new FormData(form);
     const companyName = formData.get('company-name') as string;
     const jobTitle = formData.get('job-title') as string;
     const jobDescription = formData.get('job-description') as string;
@@ -95,7 +121,6 @@ const Upload = () => {
   return (
     <main className="bg-[url('/images/bg-main.svg')] bg-cover">
       <Navbar />
-
       <section className='main-section'>
         <div className='page-heading py-16'>
           <h1>Smart feedback for your dream job</h1>
@@ -143,12 +168,10 @@ const Upload = () => {
                   id='job-description'
                 />
               </div>
-
               <div className='form-div'>
                 <label htmlFor='uploader'>Upload Resume</label>
                 <FileUploader onFileSelect={handleFileSelect} />
               </div>
-
               <button
                 className='primary-button'
                 type='submit'
@@ -162,4 +185,5 @@ const Upload = () => {
     </main>
   );
 };
+
 export default Upload;

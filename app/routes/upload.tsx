@@ -5,17 +5,8 @@ import Navbar from "~/components/Navbar"
 import FileUploader from "~/components/FileUploader"
 import { usePuterStore } from "~/lib/puter"
 import { useNavigate } from "react-router"
-import { convertPdfToImage } from "~/lib/pdf2img"
 import { generateUUID } from "~/lib/utils"
 import { prepareInstructions } from "../../constants"
-
-// Mobile detection function
-const isMobileDevice = () => {
-  const userAgent = navigator.userAgent.toLowerCase()
-  const isMobileUserAgent = /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
-  const isSmallScreen = typeof window !== "undefined" && window.innerWidth <= 768
-  return isMobileUserAgent || isSmallScreen
-}
 
 const Upload = () => {
   const { auth, isLoading, fs, ai, kv } = usePuterStore()
@@ -41,43 +32,16 @@ const Upload = () => {
   }) => {
     setIsProcessing(true)
 
-    // Check if mobile device
-    const isMobile = isMobileDevice()
-    console.log("Is mobile device:", isMobile) // Debug log
-
     setStatusText("Uploading the file...")
     const uploadedFile = await fs.upload([file])
     if (!uploadedFile) return setStatusText("Error: Failed to upload file")
-
-    let imagePath = ""
-
-    // MOBILE: Skip PDF to image conversion completely
-    if (isMobile) {
-      console.log("Mobile detected - skipping PDF to image conversion") // Debug log
-      setStatusText("Processing for mobile...")
-      // Set imagePath to empty string for mobile
-      imagePath = ""
-    }
-    // DESKTOP/LAPTOP: Do PDF to image conversion
-    else {
-      console.log("Desktop detected - converting PDF to image") // Debug log
-      setStatusText("Converting to image...")
-      const imageFile = await convertPdfToImage(file)
-      if (!imageFile.file) return setStatusText("Error: Failed to convert PDF to image")
-
-      setStatusText("Uploading the image...")
-      const uploadedImage = await fs.upload([imageFile.file])
-      if (!uploadedImage) return setStatusText("Error: Failed to upload image")
-
-      imagePath = uploadedImage.path
-    }
 
     setStatusText("Preparing data...")
     const uuid = generateUUID()
     const data = {
       id: uuid,
       resumePath: uploadedFile.path,
-      imagePath: imagePath, // Will be empty string on mobile
+      imagePath: "", // No image conversion - always empty
       companyName,
       jobTitle,
       jobDescription,
@@ -98,7 +62,7 @@ const Upload = () => {
     await kv.set(`resume:${uuid}`, JSON.stringify(data))
 
     setStatusText("Analysis complete, redirecting...")
-    console.log("Final data:", data) // Debug log
+    console.log(data)
     navigate(`/resume/${uuid}`)
   }
 

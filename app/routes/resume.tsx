@@ -55,7 +55,7 @@ const Resume = () => {
                             <a href={resumeUrl} target="_blank" rel="noopener noreferrer">
                                 <iframe
                                     src={resumeUrl}
-                                    className="w-full h-full rounded-2xl"
+                                    className="w-full h-full rounded-2xl hidden lg:flex"
                                     title="resume"
                                 />
                             </a>

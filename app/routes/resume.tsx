@@ -55,26 +55,12 @@ export const meta = () => [
   { name: "description", content: "Detailed overview of your resume" },
 ]
 
-// Mobile detection function
-const isMobileDevice = () => {
-  const userAgent = navigator.userAgent.toLowerCase()
-  const isMobileUserAgent = /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
-  const isSmallScreen = typeof window !== "undefined" && window.innerWidth <= 768
-  return isMobileUserAgent || isSmallScreen
-}
-
 const Resume = () => {
   const { auth, isLoading, fs, kv } = usePuterStore()
   const { id } = useParams<{ id: string }>()
-  const [imageUrl, setImageUrl] = useState("")
   const [resumeUrl, setResumeUrl] = useState("")
   const [feedback, setFeedback] = useState<Feedback | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
   const navigate = useNavigate()
-
-  useEffect(() => {
-    setIsMobile(isMobileDevice())
-  }, [])
 
   useEffect(() => {
     if (!isLoading && !auth.isAuthenticated) navigate(`/auth?next=/resume/${id}`)
@@ -95,49 +81,13 @@ const Resume = () => {
       const resumeUrl = URL.createObjectURL(pdfBlob)
       setResumeUrl(resumeUrl)
 
-      // Only try to load image if imagePath exists (desktop uploads)
-      if (data.imagePath) {
-        const imageBlob = await fs.read(data.imagePath)
-        if (imageBlob) {
-          const imageUrl = URL.createObjectURL(imageBlob)
-          setImageUrl(imageUrl)
-        }
-      }
-
       setFeedback(data.feedback)
-      console.log({ resumeUrl, imageUrl, feedback: data.feedback })
+      console.log({ resumeUrl, feedback: data.feedback })
     }
 
     loadResume()
   }, [id, kv, fs])
 
-  // MOBILE: Show only feedback content (ATS, Details, Summary)
-  if (isMobile) {
-    return (
-      <main className="!pt-0">
-        <nav className="resume-nav">
-          <Link to="/" className="back-button">
-            <img src="/icons/back.svg" alt="logo" className="w-2.5 h-2.5" />
-            <span className="text-gray-800 text-sm font-semibold">Back to Homepage</span>
-          </Link>
-        </nav>
-        <section className="feedback-section">
-          <h2 className="text-4xl !text-black font-bold">Resume Review</h2>
-          {feedback ? (
-            <div className="flex flex-col gap-8 animate-in fade-in duration-1000">
-              <Summary feedback={feedback} />
-              <ATS score={feedback.ATS.score || 0} suggestions={feedback.ATS.tips || []} />
-              <Details feedback={feedback} />
-            </div>
-          ) : (
-            <img src="/images/resume-scan-2.gif" className="w-full" />
-          )}
-        </section>
-      </main>
-    )
-  }
-
-  // DESKTOP/LAPTOP: Show full layout with image/PDF preview
   return (
     <main className="!pt-0">
       <nav className="resume-nav">
@@ -148,15 +98,9 @@ const Resume = () => {
       </nav>
       <div className="flex flex-row w-full max-lg:flex-col-reverse">
         <section className='feedback-section bg-[url("/images/bg-small.svg")] bg-cover h-[100vh] sticky top-0 items-center justify-center'>
-          {imageUrl && resumeUrl && (
-            <div className="animate-in fade-in duration-1000 gradient-border max-sm:m-0 h-[90%] max-2xl:h-fit w-fit">
-              <a href={resumeUrl} target="_blank" rel="noopener noreferrer">
-                <img
-                  src={imageUrl || "/placeholder.svg"}
-                  className="w-full h-full object-contain rounded-2xl"
-                  title="resume"
-                />
-              </a>
+          {resumeUrl && (
+            <div className="animate-in fade-in duration-1000 gradient-border max-sm:m-0 h-[90%] max-2xl:h-fit w-full max-w-2xl">
+              <iframe src={resumeUrl} className="w-full h-full rounded-2xl" title="Resume PDF" />
             </div>
           )}
         </section>
